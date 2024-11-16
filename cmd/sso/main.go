@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/kirinyoku/grpc-auth-sso/internal/app"
 	"github.com/kirinyoku/grpc-auth-sso/internal/config"
 )
 
@@ -18,6 +19,9 @@ func main() {
 
 	log := setupLogger(cfg.Env)
 	log.Info("starting application", slog.String("env", cfg.Env))
+
+	application := app.New(log, cfg.GRPC.Port, cfg.StoragePath, cfg.TokenTTL)
+	application.GRPCApp.MustRun()
 }
 
 func setupLogger(env string) *slog.Logger {
