@@ -2,8 +2,11 @@ package auth
 
 import (
 	"context"
+	"errors"
 
 	ssov1 "github.com/kirinyoku/grpc-auth-protos/gen/go/sso"
+	"github.com/kirinyoku/grpc-auth-sso/internal/services/auth"
+	"github.com/kirinyoku/grpc-auth-sso/internal/storage"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -39,7 +42,11 @@ func (s *serverAPI) Login(ctx context.Context, req *ssov1.LoginRequest) (*ssov1.
 
 	token, err := s.auth.Login(ctx, req.GetEmail(), req.GetPassword(), int(req.GetAppId()))
 	if err != nil {
-		return nil, status.Error(codes.Internal, "internal error")
+		if errors.Is(err, auth.ErrInvalidCredentials) {
+			return nil, status.Error(codes.InvalidArgument, "invalid email or password")
+		}
+
+		return nil, status.Error(codes.Internal, "failed to login")
 	}
 
 	return &ssov1.LoginResponse{Token: token}, nil
@@ -56,7 +63,11 @@ func (s *serverAPI) Register(ctx context.Context, req *ssov1.RegisterRequest) (*
 
 	userID, err := s.auth.RegisterNewUser(ctx, req.GetEmail(), req.GetPassword())
 	if err != nil {
-		return nil, status.Error(codes.Internal, "internal error")
+		if errors.Is(err, storage.ErrUserExists) {
+			return nil, status.Error(codes.AlreadyExists, "user already exists")
+		}
+
+		return nil, status.Error(codes.Internal, "failed to register user")
 	}
 
 	return &ssov1.RegisterResponse{
@@ -71,7 +82,11 @@ func (s *serverAPI) IsAdmin(ctx context.Context, req *ssov1.IsAdminRequest) (*ss
 
 	isAdmin, err := s.auth.IsAdmin(ctx, req.GetUserId())
 	if err != nil {
-		return nil, status.Error(codes.Internal, "internal error")
+		if errors.Is(err, storage.ErrUserNotFound) {
+			return nil, status.Error(codes.NotFound, "user not found")
+		}
+
+		return nil, status.Error(codes.Internal, "failed to check admin status")
 	}
 
 	return &ssov1.IsAdminResponse{
